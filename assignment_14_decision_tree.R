@@ -1,0 +1,133 @@
+
+companyData <- read.csv(file.choose())
+attach(companyData)
+require(tree)
+names(companyData)
+#take a look at the histogram of company sales
+hist(Sales)
+
+#Sales is a quantitative variable
+#demonstrate it using trees with a binary response
+#To do so, turn Sales into a binary variable,
+#which will be called High. 
+#If the sales is less than 8, it will be not high. 
+#Otherwise, it will be high. 
+#Then you can put that new variable High 
+#back into the dataframe.
+High = ifelse(Sales<=8, "No", "Yes")
+companyData = data.frame(companyData, High)
+
+#fill a model using decision trees
+#Of course, you can't have the Sales variable here 
+#because your response variable High was created from Sales. 
+#Thus, let's exclude it and fit the tree.
+tree.companyData = tree(High~.-Sales, data=companyData)
+
+#the summary of your classification tree
+summary(tree.companyData)
+
+#To make it more visual, 
+#let's plot the tree as well, 
+#then annotate it using the handy text function:
+plot(tree.companyData)
+text(tree.companyData, pretty = 0)
+
+#For a detailed summary of the tree, 
+#simply print it
+tree.companyData
+
+# create a training set and a test 
+#by splitting the company data dataframe 
+#into 250 training and 150 test samples. 
+#First, set a seed to make 
+#the results reproducible. 
+#Then take a random sample of 
+#the ID (index) numbers of the samples. 
+#Specifically here, you sample from 
+#the set 1 to n row number 
+#of rows of company data, which is 400.
+#You want a sample of size 250 
+#(by default, sample uses without replacement).
+set.seed(101)
+train=sample(1:nrow(companyData), 250)
+
+#you get this index of train, 
+#which indexes 250 of the 400 observations. 
+#You can refit the model with tree, 
+#using the same formula 
+#except telling the tree to use 
+#a subset equals train. 
+#Then let's make a plot
+tree.companyData = tree(High~.-Sales, companyData, subset=train)
+plot(tree.companyData)
+text(tree.companyData, pretty=0)
+
+#take this tree and 
+#predict it on the test set, 
+#using the predict method for trees
+tree.pred = predict(tree.companyData, companyData[-train,], type="class")
+
+#evalute the error by using a misclassification table
+with(companyData[-train,], table(tree.pred, High))
+
+#On the diagonals are 
+#the correct classifications, 
+#while off the diagonals are 
+#the incorrect ones.
+#recored the correct ones. 
+#To do that, 
+#take the sum of the 2 diagonals 
+#divided by the total (150 test observations).
+(74+39)/150
+#an error of 0.76 with this tree
+
+#When growing a big bushy tree, 
+#it could have too much variance. 
+#Thus, let's use cross-validation 
+#to prune the tree optimally. 
+#Using cv.tree, use 
+#the misclassification error 
+#as the basis for doing the pruning.
+cv.companyData = cv.tree(tree.companyData, FUN = prune.misclass)
+cv.companyData
+
+#plot this out
+plot(cv.companyData)
+
+#Looking at the plot,
+#see a downward spiral part 
+#because of the misclassification error 
+#on 250 cross-validated points. 
+#So let's pick a value in the downward steps (12). 
+#Then, let's prune the tree to a size of 12 
+#to identify that tree. 
+#Finally, let's plot and annotate 
+#that tree to see the outcome.
+prune.companyData = prune.misclass(tree.companyData, best = 12)
+plot(prune.companyData)
+text(prune.companyData, pretty=0)
+
+#It's a bit shallower than 
+#the previous trees, and you can actually 
+#read the labels. 
+#Let's evaluate it 
+#on the test dataset again.
+tree.pred = predict(prune.companyData, companyData[-train,], type="class")
+with(companyData[-train,], table(tree.pred, High))
+(72 + 38) / 150
+##an error of 0.73 with this tree
+
+#Seems like the correct classifications 
+#dropped a little bit. 
+#It has done about the same 
+#as your original tree, 
+#so pruning did not hurt much 
+#with respect to misclassification errors, 
+#and gave a simpler tree.
+
+#Often case,
+#trees don't give very good prediction errors, 
+#random forests and boosting,  
+#tend to outperform trees
+#as far as prediction and misclassification 
+#are concerned.
